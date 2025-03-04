@@ -1,0 +1,2 @@
+data/swat/** filter=lfs diff=lfs merge=lfs -text
+data/wadi/** filter=lfs diff=lfs merge=lfs -text
