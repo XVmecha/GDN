@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, random_split, Subset
-
+import time
 from sklearn.preprocessing import MinMaxScaler
 
 from util.env import get_device, set_device
@@ -41,8 +41,8 @@ class Main():
         self.datestr = None
 
         dataset = self.env_config['dataset'] 
-        train_orig = pd.read_csv(f'./data/{dataset}/train.csv', sep=',', index_col=0)
-        test_orig = pd.read_csv(f'./data/{dataset}/test.csv', sep=',', index_col=0)
+        train_orig = pd.read_csv(f'./data/{dataset}/train.csv', sep=',', index_col=False)
+        test_orig = pd.read_csv(f'./data/{dataset}/test.csv', sep=',', index_col=False)
        
         train, test = train_orig, test_orig
 
@@ -54,7 +54,7 @@ class Main():
 
         set_device(env_config['device'])
         self.device = get_device()
-
+        self.dataset = self.env_config['dataset']
         fc_edge_index = build_loc_net(fc_struc, list(train.columns), feature_map=feature_map)
         fc_edge_index = torch.tensor(fc_edge_index, dtype = torch.long)
 
@@ -125,6 +125,31 @@ class Main():
 
         self.get_score(self.test_result, self.val_result)
 
+        self.learned_graph = self.get_adjacency_matrix(best_model)
+
+    def get_adjacency_matrix(self, best_model):
+        x, labels, attack_labels, edge_index = next(iter(self.test_dataloader))
+        x, edge_index = x.float().to(self.device), edge_index.float().to(self.device)
+
+        # Forward pass to compute the learned graph
+        _ = best_model(x, edge_index)
+
+        # Access the learned graph structure
+        learned_graph = best_model.learned_graph
+
+        learned_graph_np = learned_graph.cpu().numpy()
+
+        # Create a file name based on the dataset
+        dataset_name = self.env_config['dataset']
+        file_path = f"./results/{dataset_name}_learned_graph.txt"
+
+        # Save the learned graph structure to a text file
+        np.savetxt(file_path, learned_graph_np, fmt='%d')
+
+        print(f"Learned graph structure saved to {file_path}")
+        return(learned_graph)
+
+
     def get_loaders(self, train_dataset, seed, batch, val_ratio=0.1):
         dataset_len = int(len(train_dataset))
         train_use_len = int(dataset_len * (1 - val_ratio))
@@ -173,6 +198,12 @@ class Main():
         print(f'precision: {info[1]}')
         print(f'recall: {info[2]}\n')
 
+        with open(f'./results/results_stats_{self.dataset}.txt', 'a') as f:
+            # Write the metrics to the file
+            f.write(f'F1 score: {info[0]}\n')
+            f.write(f'precision: {info[1]}\n')
+            f.write(f'recall: {info[2]}\n')
+
 
     def get_save_path(self, feature_name=''):
 
@@ -217,6 +248,8 @@ if __name__ == "__main__":
     parser.add_argument('-load_model_path', help='trained model path', type = str, default='')
 
     args = parser.parse_args()
+    #for randomness
+    args.random_seed = int(time.time()) % 10000
 
     random.seed(args.random_seed)
     np.random.seed(args.random_seed)
@@ -226,7 +259,8 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     os.environ['PYTHONHASHSEED'] = str(args.random_seed)
-
+    with open(f'./results/seeds_{args.dataset}.txt', 'a') as f:
+        f.write(f'seed: {args.random_seed}\n')
 
     train_config = {
         'batch': args.batch,
