@@ -104,3 +104,66 @@ def save_attack_infos(f1_scores, total_err_scores, labels, names, save_path, dat
 
     with open(save_path, 'w+') as outfile:
         json.dump(save_infos, outfile, indent=4)  
+
+def export_fn_fp_timesteps(pred_labels, gt_labels, dataset_name, slide_win):
+    """
+    Export false negative and false positive timesteps to separate files.
+    
+    Args:
+        total_err_scores: The anomaly scores for each time point
+        gt_labels: Ground truth labels (0: normal, 1: anomaly)
+        dataset_name: Name of the dataset (for filename)
+        slide_win: Sliding window size from the configuration
+    """
+    import numpy as np
+    from datetime import datetime
+    import time
+    
+    # TODO to use
+    gt_labels = np.array(gt_labels)
+    for i in range(len(pred_labels)):
+        pred_labels[i] = int(pred_labels[i])
+        gt_labels[i] = int(gt_labels[i])
+    
+    # Find false negatives (gt=1, pred=0) and false positives (gt=0, pred=1)
+    fn_indices = np.where((gt_labels == 1) & (pred_labels == 0))[0]
+    fp_indices = np.where((gt_labels == 0) & (pred_labels == 1))[0]
+    
+    # Set start timestamp based on dataset
+    if dataset_name == 'wadi' or dataset_name == 'wadi2':
+        start_s = int(time.mktime(datetime.strptime('09/10/2017 18:00:00', "%d/%m/%Y %H:%M:%S").timetuple()))
+    elif dataset_name == 'swat':
+        start_s = int(time.mktime(datetime.strptime('28/12/2015 10:00:00', "%d/%m/%Y %H:%M:%S").timetuple()))
+    else:
+        # Default to current time if dataset is unknown
+        start_s = int(time.time())
+    
+    # Calculate timesteps - adding slide_win to account for the sliding window offset
+    down_len = 1  # Default downsampling length is 1 unless specified otherwise
+    
+    # Export false negatives
+    with open(f'./results/{dataset_name}/fn_timesteps.txt', 'w') as f:
+        for idx in fn_indices:
+            timestep = start_s + (idx + slide_win) * down_len
+            timestamp = datetime.fromtimestamp(timestep).strftime("%d/%m/%Y %H:%M:%S")
+            f.write(f"{idx},{timestamp}\n")
+    
+    # Export false positives
+    with open(f'./results/{dataset_name}/fp_timesteps.txt', 'w') as f:
+        for idx in fp_indices:
+            timestep = start_s + (idx + slide_win) * down_len
+            timestamp = datetime.fromtimestamp(timestep).strftime("%d/%m/%Y %H:%M:%S")
+            f.write(f"{idx},{timestamp}\n")
+    
+    print(f"Exported {len(fn_indices)} false negatives to ./results/{dataset_name}/fn_timesteps.txt")
+    print(f"Exported {len(fp_indices)} false positives to ./results/{dataset_name}/fp_timesteps.txt")
+
+
+# To integrate this with the existing code, add this to the get_score method in main.py:
+# After this line in get_score:
+#     print(f'F1 score: {info[0]}')
+#     print(f'precision: {info[1]}')
+#     print(f'recall: {info[2]}\n')
+#
+# Add:
+#     export_fn_fp_timesteps(test_scores, test_labels, info[4], self.env_config['dataset'], self.train_config['slide_win'])

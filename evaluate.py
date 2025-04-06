@@ -154,6 +154,6 @@ def get_best_performance_data(total_err_scores, gt_labels, topk=1):
     rec = recall_score(gt_labels, pred_labels)
 
     auc_score = roc_auc_score(gt_labels, total_topk_err_scores)
-
-    return max(final_topk_fmeas), pre, rec, auc_score, thresold
+    # added new
+    return max(final_topk_fmeas), pre, rec, auc_score, thresold, pred_labels, gt_labels
 

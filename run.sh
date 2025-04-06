@@ -11,12 +11,12 @@ topk=5
 out_layer_inter_dim=128
 val_ratio=0.2
 decay=0
-
+early_stopping_win=10
 
 path_pattern="${DATASET}"
 COMMENT="${DATASET}"
 
-EPOCH=30
+EPOCH=50
 report='best'
 
 if [[ "$gpu_n" == "cpu" ]]; then
@@ -37,6 +37,7 @@ if [[ "$gpu_n" == "cpu" ]]; then
         -val_ratio $val_ratio \
         -report $report \
         -topk $topk \
+
         -device 'cpu'
 else
     CUDA_VISIBLE_DEVICES=$gpu_n  python main.py \

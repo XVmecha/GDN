@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 from util.env import get_device, set_device
 from util.preprocess import build_loc_net, construct_data
 from util.net_struct import get_feature_map, get_fc_graph_struc
-from util.iostream import printsep
+from util.iostream import printsep, save_attack_infos, export_fn_fp_timesteps
 
 from datasets.TimeDataset import TimeDataset
 
@@ -39,7 +39,6 @@ class Main():
         self.train_config = train_config
         self.env_config = env_config
         self.datestr = None
-
         dataset = self.env_config['dataset'] 
         train_orig = pd.read_csv(f'./data/{dataset}/train.csv', sep=',', index_col=False)
         test_orig = pd.read_csv(f'./data/{dataset}/test.csv', sep=',', index_col=False)
@@ -96,8 +95,6 @@ class Main():
                 topk=train_config['topk']
             ).to(self.device)
 
-
-
     def run(self):
 
         if len(self.env_config['load_model_path']) > 0:
@@ -141,7 +138,7 @@ class Main():
 
         # Create a file name based on the dataset
         dataset_name = self.env_config['dataset']
-        file_path = f"./results/{dataset_name}_learned_graph.txt"
+        file_path = f"./results/{dataset_name}/{dataset_name}_learned_graph.txt"
 
         # Save the learned graph structure to a text file
         np.savetxt(file_path, learned_graph_np, fmt='%d')
@@ -198,11 +195,20 @@ class Main():
         print(f'precision: {info[1]}')
         print(f'recall: {info[2]}\n')
 
-        with open(f'./results/results_stats_{self.dataset}.txt', 'a') as f:
-            # Write the metrics to the file
-            f.write(f'F1 score: {info[0]}\n')
-            f.write(f'precision: {info[1]}\n')
-            f.write(f'recall: {info[2]}\n')
+        # Add the attack info export here
+        save_path = f'./results/{self.env_config["dataset"]}/attack_info.json'
+        save_attack_infos(
+            [info[0], info[0], info[0]],  # F1 scores (using the same score for all three positions)
+            test_scores,
+            test_labels,
+            self.feature_map,  # This contains the sensor names
+            save_path, 
+            self.env_config['dataset'],
+            {'slide_win': self.train_config['slide_win'], 'down_len': 1}  # Config (assuming down_len=1)
+        )
+        
+        # Also add your false negative/positive export here if needed
+        export_fn_fp_timesteps(info[5], info[6], self.env_config['dataset'], self.train_config['slide_win'])
 
 
     def get_save_path(self, feature_name=''):
@@ -258,8 +264,9 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(args.random_seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
+    #remove
     os.environ['PYTHONHASHSEED'] = str(args.random_seed)
-    with open(f'./results/seeds_{args.dataset}.txt', 'a') as f:
+    with open(f'./results/{args.dataset}/seeds_{args.dataset}.txt', 'a') as f:
         f.write(f'seed: {args.random_seed}\n')
 
     train_config = {

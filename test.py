@@ -60,7 +60,6 @@ def test(model, dataloader):
                 t_test_predicted_list = torch.cat((t_test_predicted_list, predicted), dim=0)
                 t_test_ground_list = torch.cat((t_test_ground_list, y), dim=0)
                 t_test_labels_list = torch.cat((t_test_labels_list, labels), dim=0)
-        
         test_loss_list.append(loss.item())
         acu_loss += loss.item()
         
